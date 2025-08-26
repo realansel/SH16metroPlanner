@@ -1,0 +1,1691 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>上海16号线出行规划（含普通车）</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#E63946',
+                        secondary: '#1D3557',
+                        accent: '#457B9D',
+                        light: '#F1FAEE',
+                        dark: '#1D3557',
+                        regular: '#588157' // 普通车颜色
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .transition-custom {
+                transition: all 0.3s ease;
+            }
+            .debug-info {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: #000;
+                color: #fff;
+                padding: 10px;
+                font-size: 12px;
+                max-height: 200px;
+                overflow-y: auto;
+                z-index: 1000;
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+    <!-- 调试信息区域 -->
+    <div id="debug-info" class="debug-info"></div>
+    
+    <!-- 顶部导航栏 -->
+    <header class="bg-primary text-white shadow-md sticky top-0 z-50 transition-all duration-300" id="navbar">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-subway text-2xl" aria-hidden="true"></i>
+                <h1 class="text-xl md:text-2xl font-bold">上海16号线出行规划</h1>
+            </div>
+            <nav class="hidden md:flex space-x-6">
+                <a href="#planner" class="hover:text-light/80 transition-custom"><i class="fa fa-calculator mr-1"></i> 规划计算器</a>
+                <a href="#timetable" class="hover:text-light/80 transition-custom"><i class="fa fa-clock-o mr-1"></i> 时刻表</a>
+            </nav>
+            <button class="md:hidden text-xl" id="menu-toggle">
+                <i class="fa fa-bars" aria-hidden="true"></i>
+            </button>
+        </div>
+        <div class="md:hidden hidden bg-primary/95 w-full" id="mobile-menu">
+            <div class="container mx-auto px-4 py-3 flex flex-col space-y-3">
+                <a href="#planner" class="py-2 hover:text-light/80 transition-custom"><i class="fa fa-calculator mr-2"></i> 规划计算器</a>
+                <a href="#timetable" class="py-2 hover:text-light/80 transition-custom"><i class="fa fa-clock-o mr-2"></i> 时刻表</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要内容 -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- 英雄区域 -->
+        <section class="bg-gradient-to-r from-secondary to-accent text-white rounded-2xl shadow-lg p-6 md:p-10 mb-10 transform hover:scale-[1.01] transition-all duration-300">
+            <div class="max-w-3xl mx-auto text-center">
+                <h2 class="text-2xl md:text-4xl font-bold mb-4 text-shadow">精准规划16号线全类型列车行程</h2>
+                <p class="text-lg md:text-xl opacity-90 mb-6">支持大站车、直达车、普通车（站站停），智能区分高峰期/平峰期/非高峰期</p>
+                <a href="#planner" class="inline-block bg-primary hover:bg-primary/90 text-white font-semibold py-3 px-6 rounded-full shadow-md transform hover:scale-105 transition-all duration-300">
+                    开始规划 <i class="fa fa-arrow-right ml-2"></i>
+                </a>
+            </div>
+        </section>
+
+        <!-- 规划计算器 -->
+        <section id="planner" class="bg-white rounded-xl shadow-md p-6 md:p-8 mb-12 transform transition-all duration-300 hover:shadow-lg">
+            <h2 class="text-2xl font-bold text-secondary mb-6 flex items-center">
+                <i class="fa fa-calculator text-primary mr-3"></i> 行程规划计算器
+            </h2>
+            
+            <!-- 错误提示区域 -->
+            <div id="error-message" class="hidden bg-red-50 border-l-4 border-red-500 p-4 rounded mb-6">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fa fa-exclamation-circle text-red-500 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-red-800" id="error-text"></p>
+                    </div>
+                </div>
+            </div>
+            
+            <form id="journey-form" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 起点站 -->
+                    <div>
+                        <label for="start-station" class="block text-gray-700 font-medium mb-2">起点站</label>
+                        <div class="relative">
+                            <select id="start-station" class="block w-full px-4 py-3 rounded-lg border border-gray-300 bg-white focus:ring-2 focus:ring-primary focus:border-primary transition-custom appearance-none">
+                                <option value="longyanglu">龙阳路</option>
+                                <option value="huaxiazhenlu">华夏中路</option>
+                                <option value="luoshanlu">罗山路</option>
+                                <option value="zhoupudong">周浦东</option>
+                                <option value="heshahangcheng">鹤沙航城</option>
+                                <option value="hangtoudong">航头东</option>
+                                <option value="xinchang">新场</option>
+                                <option value="yeshengdongwuyuan">野生动物园</option>
+                                <option value="huinan">惠南</option>
+                                <option value="huinandong">惠南东</option>
+                                <option value="shuyuan">书院</option>
+                                <option value="lingangdadao">临港大道</option>
+                                <option value="dishuihu" selected>滴水湖</option>
+                            </select>
+                            <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
+                                <i class="fa fa-chevron-down"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 终点站 -->
+                    <div>
+                        <label for="end-station" class="block text-gray-700 font-medium mb-2">终点站</label>
+                        <div class="relative">
+                            <select id="end-station" class="block w-full px-4 py-3 rounded-lg border border-gray-300 bg-white focus:ring-2 focus:ring-primary focus:border-primary transition-custom appearance-none">
+                                <option value="longyanglu">龙阳路</option>
+                                <option value="huaxiazhenlu">华夏中路</option>
+                                <option value="luoshanlu">罗山路</option>
+                                <option value="zhoupudong">周浦东</option>
+                                <option value="heshahangcheng">鹤沙航城</option>
+                                <option value="hangtoudong">航头东</option>
+                                <option value="xinchang">新场</option>
+                                <option value="yeshengdongwuyuan">野生动物园</option>
+                                <option value="huinan">惠南</option>
+                                <option value="huinandong">惠南东</option>
+                                <option value="shuyuan">书院</option>
+                                <option value="lingangdadao">临港大道</option>
+                                <option value="dishuihu">滴水湖</option>
+                            </select>
+                            <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
+                                <i class="fa fa-chevron-down"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 到达日期 -->
+                    <div>
+                        <label for="arrival-date" class="block text-gray-700 font-medium mb-2">到达日期</label>
+                        <div class="relative">
+                            <input type="date" id="arrival-date" class="block w-full px-4 py-3 rounded-lg border border-gray-300 bg-white focus:ring-2 focus:ring-primary focus:border-primary transition-custom">
+                        </div>
+                    </div>
+
+                    <!-- 到达时间 -->
+                    <div>
+                        <label for="arrival-time" class="block text-gray-700 font-medium mb-2">到达时间</label>
+                        <div class="relative">
+                            <input type="time" id="arrival-time" class="block w-full px-4 py-3 rounded-lg border border-gray-300 bg-white focus:ring-2 focus:ring-primary focus:border-primary transition-custom">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 额外选项 -->
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h3 class="font-medium text-gray-700 mb-3">偏好设置</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="flex items-center">
+                            <input type="radio" id="prefer-fast" name="preference" value="fast" checked class="w-4 h-4 text-primary focus:ring-primary">
+                            <label for="prefer-fast" class="ml-2 text-gray-700">优先最快到达</label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="radio" id="prefer-direct" name="preference" value="direct" class="w-4 h-4 text-primary focus:ring-primary">
+                            <label for="prefer-direct" class="ml-2 text-gray-700">优先直达车</label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="radio" id="prefer-express" name="preference" value="express" class="w-4 h-4 text-primary focus:ring-primary">
+                            <label for="prefer-express" class="ml-2 text-gray-700">优先大站车</label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="radio" id="prefer-local" name="preference" value="local" class="w-4 h-4 text-regular focus:ring-regular">
+                            <label for="prefer-local" class="ml-2 text-gray-700">优先普通车（站站停）</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 提交按钮 -->
+                <div class="text-center">
+                    <button type="button" id="calculate-button" class="bg-primary hover:bg-primary/90 text-white font-semibold py-3 px-8 rounded-full shadow-md transform hover:scale-105 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                        <i class="fa fa-search mr-2"></i> 计算行程
+                    </button>
+                    <button type="button" id="toggle-debug" class="ml-4 text-sm text-gray-500 hover:text-gray-700">
+                        显示/隐藏调试信息
+                    </button>
+                </div>
+            </form>
+
+            <!-- 结果显示区域 -->
+            <div id="result" class="mt-8 hidden">
+                <div class="border-t border-gray-200 pt-6">
+                    <h3 class="text-xl font-bold text-secondary mb-4">推荐行程</h3>
+                    <div class="bg-light rounded-lg p-6 shadow-sm border border-gray-100">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between mb-4 pb-4 border-b border-gray-200">
+                            <div>
+                                <p class="text-gray-600">从 <span id="result-start" class="font-semibold text-secondary"></span> 到 <span id="result-end" class="font-semibold text-secondary"></span></p>
+                                <p class="text-gray-600">需要在 <span id="result-arrival" class="font-semibold text-secondary"></span> 到达</p>
+                                <p class="text-gray-600 mt-1"><span id="result-date-type" class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm"></span></p>
+                            </div>
+                            <div class="mt-3 md:mt-0 px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-medium">
+                                <i class="fa fa-train mr-1"></i> <span id="result-train-type"></span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div class="text-center p-4 bg-white rounded-lg shadow-sm border border-gray-100 transition-all hover:shadow-md">
+                                <p class="text-gray-500 text-sm">建议乘坐车次</p>
+                                <p id="result-departure" class="text-2xl font-bold text-secondary mt-1"></p>
+                            </div>
+                            <div class="text-center p-4 bg-white rounded-lg shadow-sm border border-gray-100 transition-all hover:shadow-md">
+                                <p class="text-gray-500 text-sm">行程时间</p>
+                                <p id="result-duration" class="text-2xl font-bold text-secondary mt-1"></p>
+                            </div>
+                            <div class="text-center p-4 bg-white rounded-lg shadow-sm border border-gray-100 transition-all hover:shadow-md">
+                                <p class="text-gray-500 text-sm">预计到达</p>
+                                <p id="result-estimated" class="text-2xl font-bold text-secondary mt-1"></p>
+                            </div>
+                        </div>
+
+                        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg mb-4 shadow-sm transition-all hover:shadow-md">
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0 mt-1">
+                                    <i class="fa fa-train text-blue-500 text-lg"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-blue-800 font-medium text-base">停靠站点</p>
+                                    <p class="text-blue-700 text-sm mt-1" id="result-stops"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-purple-50 border-l-4 border-purple-500 p-4 rounded-lg mb-4 shadow-sm transition-all hover:shadow-md">
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0 mt-1">
+                                    <i class="fa fa-clock-o text-purple-500 text-lg"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-purple-800 font-medium text-base">其他列车</p>
+                                    <p class="text-purple-700 text-sm mt-1" id="other-trains-info"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-lg shadow-sm transition-all hover:shadow-md">
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0 mt-1">
+                                    <i class="fa fa-lightbulb-o text-green-500 text-lg"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-green-800 font-medium text-base">出行建议</p>
+                                    <p class="text-green-700 text-sm mt-1" id="result-advice"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+
+        <!-- 时刻表 -->
+        <section id="timetable" class="bg-white rounded-xl shadow-md p-6 md:p-8 mb-12 transition-all hover:shadow-lg">
+            <h2 class="text-2xl font-bold text-secondary mb-6 flex items-center">
+                <i class="fa fa-clock-o text-primary mr-3"></i> 列车时刻表
+            </h2>
+            
+            <!-- 工作日时刻表 -->
+            <div class="mb-8 rounded-lg overflow-hidden border border-gray-100">
+                <div class="bg-gray-50 px-6 py-3 flex items-center border-b border-gray-100">
+                    <span class="w-3 h-3 rounded-full bg-red-500 mr-2"></span>
+                    <h3 class="text-lg font-semibold text-secondary">工作日</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">方向</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">列车类型</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间段</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">发车间隔</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">全程耗时</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap" rowspan="3">
+                                    <div class="text-sm font-medium text-gray-900">龙阳路 → 滴水湖</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap" rowspan="3">
+                                    <div class="text-sm text-gray-900">普通车</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">首班车</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">5:50 发车</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" rowspan="3">57分钟</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">高峰期 (7:00-9:00, 17:00-19:00)</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">约5分钟一班</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">平峰期/非高峰期</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">约8-12分钟一班</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">龙阳路 → 滴水湖</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">大站车</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">07:00-21:00</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    每小时整点<br>
+                                    <span class="text-red-500 text-xs">* 8:00、9:00无车</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">46分钟</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">龙阳路 → 滴水湖</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">直达车</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">早高峰</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    07:30, 07:45
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">34分钟</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap" rowspan="3">
+                                    <div class="text-sm font-medium text-gray-900">滴水湖 → 龙阳路</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap" rowspan="3">
+                                    <div class="text-sm text-gray-900">普通车</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">首班车</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">6:00 发车</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" rowspan="3">59分钟</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">高峰期 (7:00-9:00, 17:00-19:00)</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">约5分钟一班</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">平峰期/非高峰期</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">约8-12分钟一班</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">滴水湖 → 龙阳路</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">大站车</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">07:00-21:00</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    每小时整点<br>
+                                    <span class="text-red-500 text-xs">* 8:00、9:00无车</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">46分钟</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">滴水湖 → 龙阳路</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">直达车</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">晚高峰</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    17:20, 18:00
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">34分钟</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- 节假日时刻表 -->
+            <div>
+                <h3 class="text-xl font-semibold text-secondary mb-4 flex items-center">
+                    <span class="w-3 h-3 rounded-full bg-green-500 mr-2"></span> 节假日
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">方向</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">列车类型</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间段</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">发车间隔</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">全程耗时</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap" rowspan="3">
+                                    <div class="text-sm font-medium text-gray-900">龙阳路 → 滴水湖</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap" rowspan="3">
+                                    <div class="text-sm text-gray-900">普通车</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">首班车</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">5:50 发车</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" rowspan="3">57分钟</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">高峰期 (10:00-16:00)</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">约8分钟一班</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">平峰期/非高峰期</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">约10-15分钟一班</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">龙阳路 → 滴水湖</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">大站车</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">07:00-21:00</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    每小时整点
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">46分钟</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap" rowspan="3">
+                                    <div class="text-sm font-medium text-gray-900">滴水湖 → 龙阳路</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap" rowspan="3">
+                                    <div class="text-sm text-gray-900">普通车</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">首班车</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">6:00 发车</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" rowspan="3">59分钟</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">高峰期 (10:00-16:00)</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">约8分钟一班</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">平峰期/非高峰期</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">约10-15分钟一班</td>
+                            </tr>
+                            <tr class="border-t border-gray-100">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">滴水湖 → 龙阳路</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">大站车</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-500">07:00-21:00</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    每小时整点
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">46分钟</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="mt-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded transition-all hover:shadow-sm">
+                <p class="text-sm text-blue-700">
+                    <i class="fa fa-info-circle mr-2"></i> 普通车停靠所有站点，大站车停靠主要站点，直达车仅在龙阳路和滴水湖之间运行。工作日指周一至周五，节假日包括周六、周日及法定节假日。直达车仅在工作日运行。
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-secondary text-white py-8 transition-all hover:shadow-lg">
+        <div class="container mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="p-4 rounded-lg hover:bg-opacity-90 transition-all">
+                    <h3 class="text-lg font-bold mb-4 flex items-center">
+                        <i class="fa fa-subway mr-2"></i> 上海16号线出行规划
+                    </h3>
+                    <p class="text-gray-300 text-sm">
+                        综合考虑普通车、大站车和直达车的精准行程规划，智能区分工作日与节假日班次。
+                    </p>
+                </div>
+                <div class="p-4 rounded-lg hover:bg-opacity-90 transition-all">
+                    <h3 class="text-lg font-bold mb-4">快速链接</h3>
+                    <ul class="space-y-2 text-gray-300">
+                        <li><a href="#planner" class="hover:text-white transition-all duration-300 transform hover:-translate-x-1"><i class="fa fa-angle-right mr-1"></i> 行程规划</a></li>
+                        <li><a href="#timetable" class="hover:text-white transition-all duration-300 transform hover:-translate-x-1"><i class="fa fa-angle-right mr-1"></i> 时刻表</a></li>
+                    </ul>
+                </div>
+                <div class="p-4 rounded-lg hover:bg-opacity-90 transition-all">
+                    <h3 class="text-lg font-bold mb-4">相关资源</h3>
+                    <ul class="space-y-2 text-gray-300">
+                        <li><a href="http://www.shmetro.com" target="_blank" class="hover:text-white transition-all duration-300 transform hover:-translate-x-1"><i class="fa fa-external-link mr-1"></i> 上海地铁官网</a></li>
+                        <li><a href="https://service.shmetro.com/hcskb/index.htm?line=16" target="_blank" class="hover:text-white transition-all duration-300 transform hover:-translate-x-1"><i class="fa fa-external-link mr-1"></i> 16号线官方信息</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 mt-8 pt-6 text-center text-gray-400 text-sm">
+                <p>© 2024 上海16号线出行规划 | 数据仅供参考，实际请以地铁运营为准</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // 站点名称映射
+        const stationNames = {
+            'dishuihu': '滴水湖',
+            'lingangdadao': '临港大道',
+            'shuyuan': '书院',
+            'huinandong': '惠南东',
+            'huinan': '惠南',
+            'yeshengdongwuyuan': '野生动物园',
+            'xinchang': '新场',
+            'hangtoudong': '航头东',
+            'heshahangcheng': '鹤沙航城',
+            'zhoupudong': '周浦东',
+            'luoshanlu': '罗山路',
+            'huaxiaz honglu': '华夏中路',
+            'longyanglu': '龙阳路'
+        };
+
+        // 大站车各站到达时间（分钟，从起点开始计算）
+        const expressStopsTime = {
+            'longyanglu_to_dishuihu': {
+                'longyanglu': 0,
+                'luoshanlu': 6,
+                'xinchang': 18,
+                'huinan': 26,
+                'lingangdadao': 43,
+                'dishuihu': 46
+            },
+            'dishuihu_to_longyanglu': {
+                'dishuihu': 0,
+                'lingangdadao': 3,
+                'huinan': 21,
+                'xinchang': 29,
+                'luoshanlu': 41,
+                'longyanglu': 46
+            }
+        };
+
+        // 普通车各站到达时间（分钟，从起点开始计算）
+        const regularStopsTime = {
+            'longyanglu_to_dishuihu': {
+                'longyanglu': 0,
+                'huaxiaz honglu': 4,
+                'luoshanlu': 8,
+                'zhoupudong': 12,
+                'heshahangcheng': 16,
+                'hangtoudong': 19,
+                'xinchang': 23,
+                'yeshengdongwuyuan': 28,
+                'huinan': 34,
+                'huinandong': 39,
+                'shuyuan': 48,
+                'lingangdadao': 54,
+                'dishuihu': 57
+            },
+            'dishuihu_to_longyanglu': {
+                'dishuihu': 0,
+                'lingangdadao': 3,
+                'shuyuan': 9,
+                'huinandong': 17,
+                'huinan': 24,
+                'yeshengdongwuyuan': 25,
+                'xinchang': 30,
+                'hangtoudong': 35,
+                'heshahangcheng': 40,
+                'zhoupudong': 46,
+                'luoshanlu': 50,
+                'huaxiaz honglu': 54,
+                'longyanglu': 59
+            }
+        };
+
+        // 普通车首末班车时间（已修正）
+        const regularTrainSchedule = {
+            'longyanglu_to_dishuihu': {
+                first: { hour: 5, minute: 50 }, // 龙阳路到滴水湖首班车时间：5:50
+                last: { hour: 22, minute: 30 }  // 龙阳路到滴水湖末班车时间：22:30
+            },
+            'dishuihu_to_longyanglu': {
+                first: { hour: 6, minute: 0 },  // 滴水湖到龙阳路首班车时间：6:00
+                last: { hour: 22, minute: 30 }  // 滴水湖到龙阳路末班车时间：22:30
+            }
+        };
+
+        // 调试函数
+        function logDebug(message) {
+            const debugEl = document.getElementById('debug-info');
+            if (debugEl) {
+                if (debugEl.style.display !== 'none') {
+                    const time = new Date().toLocaleTimeString();
+                    debugEl.innerHTML += `[${time}] ${message}<br>`;
+                    debugEl.scrollTop = debugEl.scrollHeight;
+                }
+            }
+            console.log(`[DEBUG] ${message}`);
+        }
+        
+        // 显示错误信息
+        function showError(message) {
+            const errorEl = document.getElementById('error-message');
+            const errorTextEl = document.getElementById('error-text');
+            
+            if (errorEl && errorTextEl) {
+                errorTextEl.textContent = message;
+                errorEl.classList.remove('hidden');
+                
+                // 5秒后自动隐藏错误信息
+                setTimeout(() => {
+                    errorEl.classList.add('hidden');
+                }, 5000);
+            }
+            logDebug(`错误: ${message}`);
+        }
+
+        // 判断时间段类型（高峰期、平峰期、非高峰期）
+        function getTimePeriod(date, isWeekday) {
+            const hour = date.getHours();
+            
+            if (isWeekday) {
+                // 工作日时间段划分
+                if ((hour >= 7 && hour < 9) || (hour >= 17 && hour < 19)) {
+                    return 'peak'; // 高峰期
+                } else if ((hour >= 9 && hour < 17) || (hour >= 19 && hour < 21)) {
+                    return 'offpeak'; // 平峰期
+                } else {
+                    return 'nonpeak'; // 非高峰期
+                }
+            } else {
+                // 节假日时间段划分
+                if (hour >= 10 && hour < 16) {
+                    return 'peak'; // 高峰期
+                } else if ((hour >= 8 && hour < 10) || (hour >= 16 && hour < 19)) {
+                    return 'offpeak'; // 平峰期
+                } else {
+                    return 'nonpeak'; // 非高峰期
+                }
+            }
+        }
+
+        // 根据时间段获取普通车发车间隔
+        function getRegularInterval(period) {
+            switch(period) {
+                case 'peak':
+                    return 5; // 高峰期5分钟一班
+                case 'offpeak':
+                    return 8; // 平峰期8分钟一班
+                case 'nonpeak':
+                    return 12; // 非高峰期12分钟一班
+                default:
+                    return 10; // 默认10分钟一班
+            }
+        }
+
+        // 检查站点是否在特定类型的列车停靠站列表中
+        function isStationInTrainType(station, trainType, direction) {
+            if (trainType === 'regular') {
+                // 普通车停靠所有站点
+                return (station in regularStopsTime[direction]);
+            } else if (trainType === 'express') {
+                // 大站车只停靠特定站点
+                return (station in expressStopsTime[direction]);
+            } else if (trainType === 'direct') {
+                // 直达车只停靠起点和终点
+                return station === 'longyanglu' || station === 'dishuihu';
+            }
+            return false;
+        }
+
+        // 生成指定日期的所有可用车次，包括普通车、大站车和直达车
+        function generateAvailableTrains(date) {
+            try {
+                logDebug('开始生成可用车次');
+                const isWeekday = isWeekdayDate(date);
+                logDebug(`日期类型: ${isWeekday ? '工作日' : '节假日'}`);
+                
+                const trains = [];
+                const year = date.getFullYear();
+                const month = date.getMonth();
+                const day = date.getDate();
+
+                // 1. 生成普通车车次（根据时间段调整频率）
+                const regularStartHour = 5; // 首班车开始小时
+                const regularEndHour = 22; // 末班车结束小时
+                
+                // 龙阳路 → 滴水湖 普通车（首班车5:50）
+                for (let hour = regularStartHour; hour <= regularEndHour; hour++) {
+                    // 创建该小时的日期对象以确定时间段
+                    const hourDate = new Date(year, month, day, hour);
+                    const period = getTimePeriod(hourDate, isWeekday);
+                    const interval = getRegularInterval(period);
+                    
+                    // 首班车特殊处理
+                    let startMinute = 0;
+                    if (hour === 5) {
+                        startMinute = 50; // 首班车5:50
+                    }
+                    
+                    // 每小时内按间隔生成车次
+                    for (let minute = startMinute; minute < 60; minute += interval) {
+                        const departure = new Date(year, month, day, hour, minute);
+                        // 末班车不晚于22:30
+                        if (hour === regularEndHour && minute > 30) break;
+                        
+                        trains.push({
+                            type: 'regular',
+                            name: '普通车',
+                            direction: 'longyanglu_to_dishuihu',
+                            departureStation: 'longyanglu',
+                            departureTime: departure,
+                            duration: 57,
+                            arrivalStation: 'dishuihu',
+                            interval: interval // 记录发车间隔
+                        });
+                    }
+                }
+                logDebug(`生成龙阳路→滴水湖普通车约 ${trains.filter(t => t.type === 'regular' && t.direction === 'longyanglu_to_dishuihu').length} 辆`);
+                
+                // 滴水湖 → 龙阳路 普通车（首班车6:00）
+                for (let hour = regularStartHour + 1; hour <= regularEndHour; hour++) { // 首班车6:00
+                    // 创建该小时的日期对象以确定时间段
+                    const hourDate = new Date(year, month, day, hour);
+                    const period = getTimePeriod(hourDate, isWeekday);
+                    const interval = getRegularInterval(period);
+                    
+                    // 每小时内按间隔生成车次
+                    for (let minute = 0; minute < 60; minute += interval) {
+                        const departure = new Date(year, month, day, hour, minute);
+                        // 末班车不晚于22:30
+                        if (hour === regularEndHour && minute > 30) break;
+                        
+                        trains.push({
+                            type: 'regular',
+                            name: '普通车',
+                            direction: 'dishuihu_to_longyanglu',
+                            departureStation: 'dishuihu',
+                            departureTime: departure,
+                            duration: 59,
+                            arrivalStation: 'longyanglu',
+                            interval: interval // 记录发车间隔
+                        });
+                    }
+                }
+                logDebug(`生成滴水湖→龙阳路普通车约 ${trains.filter(t => t.type === 'regular' && t.direction === 'dishuihu_to_longyanglu').length} 辆`);
+
+                // 2. 生成大站车车次（每小时整点，7:00-21:00）
+                for (let hour = 7; hour <= 21; hour++) {
+                    // 工作日跳过8:00和9:00
+                    if (isWeekday && (hour === 8 || hour === 9)) {
+                        logDebug(`跳过工作日${hour}:00的大站车`);
+                        continue;
+                    }
+
+                    // 龙阳路 → 滴水湖 大站车
+                    const lydDeparture = new Date(year, month, day, hour, 0);
+                    trains.push({
+                        type: 'express',
+                        name: '大站车',
+                        direction: 'longyanglu_to_dishuihu',
+                        departureStation: 'longyanglu',
+                        departureTime: lydDeparture,
+                        duration: 46,
+                        arrivalStation: 'dishuihu'
+                    });
+                    logDebug(`生成大站车: 龙阳路 ${hour}:00 发车`);
+
+                    // 滴水湖 → 龙阳路 大站车
+                    const dllDeparture = new Date(year, month, day, hour, 0);
+                    trains.push({
+                        type: 'express',
+                        name: '大站车',
+                        direction: 'dishuihu_to_longyanglu',
+                        departureStation: 'dishuihu',
+                        departureTime: dllDeparture,
+                        duration: 46,
+                        arrivalStation: 'longyanglu'
+                    });
+                    logDebug(`生成大站车: 滴水湖 ${hour}:00 发车`);
+                }
+
+                // 3. 工作日添加直达车
+                if (isWeekday) {
+                    // 龙阳路 → 滴水湖 直达车
+                    trains.push({
+                        type: 'direct',
+                        name: '直达车',
+                        direction: 'longyanglu_to_dishuihu',
+                        departureStation: 'longyanglu',
+                        departureTime: new Date(year, month, day, 7, 30),
+                        duration: 34,
+                        arrivalStation: 'dishuihu'
+                    });
+                    logDebug('生成直达车: 龙阳路 7:30 发车');
+                    
+                    trains.push({
+                        type: 'direct',
+                        name: '直达车',
+                        direction: 'longyanglu_to_dishuihu',
+                        departureStation: 'longyanglu',
+                        departureTime: new Date(year, month, day, 7, 45),
+                        duration: 34,
+                        arrivalStation: 'dishuihu'
+                    });
+                    logDebug('生成直达车: 龙阳路 7:45 发车');
+
+                    // 滴水湖 → 龙阳路 直达车
+                    trains.push({
+                        type: 'direct',
+                        name: '直达车',
+                        direction: 'dishuihu_to_longyanglu',
+                        departureStation: 'dishuihu',
+                        departureTime: new Date(year, month, day, 17, 20),
+                        duration: 34,
+                        arrivalStation: 'longyanglu'
+                    });
+                    logDebug('生成直达车: 滴水湖 17:20 发车');
+                    
+                    trains.push({
+                        type: 'direct',
+                        name: '直达车',
+                        direction: 'dishuihu_to_longyanglu',
+                        departureStation: 'dishuihu',
+                        departureTime: new Date(year, month, day, 18, 0),
+                        duration: 34,
+                        arrivalStation: 'longyanglu'
+                    });
+                    logDebug('生成直达车: 滴水湖 18:00 发车');
+                }
+
+                logDebug(`共生成 ${trains.length} 个车次（普通车、大站车和直达车）`);
+                return trains;
+            } catch (error) {
+                logDebug(`生成车次时出错: ${error.message}`);
+                showError(`生成车次信息失败: ${error.message}`);
+                return [];
+            }
+        }
+
+        // 判断日期是否为工作日（周一至周五）
+        function isWeekdayDate(date) {
+            try {
+                const day = date.getDay();
+                logDebug(`日期: ${date.toLocaleDateString()}, 星期: ${day} (0=周日, 6=周六)`);
+                return day !== 0 && day !== 6; // 0是周日，6是周六
+            } catch (error) {
+                logDebug(`判断工作日时出错: ${error.message}`);
+                showError(`日期处理失败: ${error.message}`);
+                return true; // 默认当作工作日
+            }
+        }
+
+        // 计算两个站点之间的行程时间
+        function calculateStopTime(trainType, direction, start, end) {
+            try {
+                let stops;
+                
+                if (trainType === 'regular') {
+                    stops = regularStopsTime[direction];
+                } else if (trainType === 'express') {
+                    stops = expressStopsTime[direction];
+                } else if (trainType === 'direct') {
+                    // 直达车只在龙阳路和滴水湖之间运行
+                    return (start === 'longyanglu' && end === 'dishuihu') || 
+                           (start === 'dishuihu' && end === 'longyanglu') ? 34 : null;
+                }
+                
+                if (!stops) {
+                    logDebug(`未找到方向 ${direction} 的站点时间`);
+                    return null;
+                }
+                
+                // 检查站点是否存在于该类型列车的停靠列表中
+                if (!isStationInTrainType(start, trainType, direction)) {
+                    logDebug(`方向 ${direction} 的${trainType === 'regular' ? '普通车' : '大站车'}中未找到起点 ${start}`);
+                    // 显示该方向下所有可用站点，便于调试
+                    logDebug(`方向 ${direction} 包含的站点: ${Object.keys(stops).join(', ')}`);
+                    return null;
+                }
+                
+                if (!isStationInTrainType(end, trainType, direction)) {
+                    logDebug(`方向 ${direction} 的${trainType === 'regular' ? '普通车' : '大站车'}中未找到终点 ${end}`);
+                    return null;
+                }
+                
+                const time = Math.abs(stops[end] - stops[start]);
+                logDebug(`计算行程时间: ${stationNames[start]} 到 ${stationNames[end]} (${trainType === 'regular' ? '普通车' : trainType === 'express' ? '大站车' : '直达车'}) 需要 ${time} 分钟`);
+                return time;
+            } catch (error) {
+                logDebug(`计算站点时间时出错: ${error.message}`);
+                showError(`计算行程时间失败: ${error.message}`);
+                return null;
+            }
+        }
+
+        // 生成站点停靠时间文本
+        function generateStopsText(trainType, direction, departureTime) {
+            try {
+                let stops, stationOrder;
+                
+                if (trainType === 'regular') {
+                    stops = regularStopsTime[direction];
+                    stationOrder = direction === 'longyanglu_to_dishuihu' 
+                        ? ['longyanglu', 'huaxiaz honglu', 'luoshanlu', 'zhoupudong', 'heshahangcheng', 
+                           'hangtoudong', 'xinchang', 'yeshengdongwuyuan', 'huinan', 'huinandong', 
+                           'shuyuan', 'lingangdadao', 'dishuihu']
+                        : ['dishuihu', 'lingangdadao', 'shuyuan', 'huinandong', 'huinan', 
+                           'yeshengdongwuyuan', 'xinchang', 'hangtoudong', 'heshahangcheng', 
+                           'zhoupudong', 'luoshanlu', 'huaxiaz honglu', 'longyanglu'];
+                } else if (trainType === 'express') {
+                    stops = expressStopsTime[direction];
+                    stationOrder = direction === 'longyanglu_to_dishuihu' 
+                        ? ['longyanglu', 'luoshanlu', 'xinchang', 'huinan', 'lingangdadao', 'dishuihu']
+                        : ['dishuihu', 'lingangdadao', 'huinan', 'xinchang', 'luoshanlu', 'longyanglu'];
+                } else if (trainType === 'direct') {
+                    // 直达车只停靠起点和终点
+                    return direction === 'longyanglu_to_dishuihu' 
+                        ? `龙阳路 → 滴水湖`
+                        : `滴水湖 → 龙阳路`;
+                }
+                
+                let text = '';
+                stationOrder.forEach(station => {
+                    const minutes = stops[station];
+                    const time = new Date(departureTime.getTime() + minutes * 60000);
+                    const timeStr = time.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                    text += `${stationNames[station]}(${timeStr}) → `;
+                });
+                
+                const result = text.slice(0, -3); // 移除最后一个箭头
+                logDebug(`生成停靠站点文本: ${result}`);
+                return result;
+            } catch (error) {
+                logDebug(`生成站点文本时出错: ${error.message}`);
+                showError(`生成站点信息失败: ${error.message}`);
+                return '无法获取站点信息';
+            }
+        }
+
+        // 计算到最近的大站车/直达车的时间间隔
+        function getNextExpressOrDirectTime(trains, currentTime, direction) {
+            try {
+                // 筛选出未来的大站车和直达车
+                const futureTrains = trains.filter(train => 
+                    (train.type === 'express' || train.type === 'direct') && 
+                    train.direction === direction && 
+                    train.departureTime > currentTime
+                );
+                
+                if (futureTrains.length === 0) {
+                    return '今日无更多车次';
+                }
+                
+                // 按发车时间排序
+                futureTrains.sort((a, b) => a.departureTime - b.departureTime);
+                
+                // 获取最近的车次
+                const nextTrain = futureTrains[0];
+                const timeDiff = Math.round((nextTrain.departureTime - currentTime) / 60000); // 转换为分钟
+                
+                return `下一班${nextTrain.name}将在${timeDiff}分钟后发车（${formatTime(nextTrain.departureTime)}）`;
+            } catch (error) {
+                logDebug(`计算下一班快车时间时出错: ${error.message}`);
+                return '无法获取车次信息';
+            }
+        }
+        
+        // 生成10分钟误差范围内的其他车型信息表格
+        function getAlternativeTrainsTable(sortedTrains, bestTrain, startStation, endStation, stationNames) {
+            try {
+                // 筛选出与最佳车次出发时间在10分钟误差范围内的其他车型
+                const tenMinutes = 10 * 60 * 1000; // 10分钟（毫秒）
+                const alternativeTrains = sortedTrains.filter(train => {
+                    // 排除最佳车次本身
+                    if (train === bestTrain) return false;
+                    
+                    // 计算与最佳车次出发时间的差值
+                    const timeDiff = Math.abs(train.startTime - bestTrain.startTime);
+                    
+                    // 只包含出发时间在10分钟误差范围内的其他车型
+                    return timeDiff <= tenMinutes;
+                });
+                
+                // 如果没有符合条件的列车，返回null
+                if (alternativeTrains.length === 0) {
+                    return null;
+                }
+                
+                // 创建表格HTML
+                let tableHtml = `<div class="overflow-x-auto mt-2">
+                                    <table class="min-w-full bg-white border border-purple-200 rounded-lg">
+                                        <thead>
+                                            <tr class="bg-purple-100 text-purple-800">
+                                                <th class="py-2 px-4 border-b text-left">列车类型</th>
+                                                <th class="py-2 px-4 border-b text-left">出发时间</th>
+                                                <th class="py-2 px-4 border-b text-left">预计到达</th>
+                                                <th class="py-2 px-4 border-b text-left">行程时间</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>`;
+                
+                // 添加每列数据
+                alternativeTrains.forEach(train => {
+                    tableHtml += `
+                        <tr class="hover:bg-purple-50 transition-colors">
+                            <td class="py-2 px-4 border-b">${train.name}</td>
+                            <td class="py-2 px-4 border-b">${formatTime(train.startTime)}</td>
+                            <td class="py-2 px-4 border-b">${formatTime(train.endTime)}</td>
+                            <td class="py-2 px-4 border-b">${train.stopTime}分钟</td>
+                        </tr>`;
+                });
+                
+                // 关闭表格HTML
+                tableHtml += `</tbody>
+                            </table>
+                        </div>`;
+                
+                return tableHtml;
+            } catch (error) {
+                logDebug(`生成替代列车表格时出错: ${error.message}`);
+                return null;
+            }
+        }
+
+        // 格式化时间
+        function formatTime(date) {
+            return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        // 格式化日期时间
+        function formatDateTime(date) {
+            return date.toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+
+        // 从到达时间反推普通车出发时间
+        function calculateRegularDepartureFromArrival(arrivalTime, direction, start, end, isWeekday) {
+            try {
+                // 计算行程时间
+                const journeyTime = calculateStopTime('regular', direction, start, end);
+                if (!journeyTime) {
+                    logDebug('无法计算普通车行程时间');
+                    return null;
+                }
+                
+                // 从到达时间减去行程时间得到理论出发时间
+                const theoreticalDeparture = new Date(arrivalTime.getTime() - journeyTime * 60000);
+                
+                // 获取首末班车时间
+                const schedule = regularTrainSchedule[direction];
+                const firstDeparture = new Date(
+                    arrivalTime.getFullYear(), 
+                    arrivalTime.getMonth(), 
+                    arrivalTime.getDate(),
+                    schedule.first.hour,
+                    schedule.first.minute
+                );
+                const lastDeparture = new Date(
+                    arrivalTime.getFullYear(), 
+                    arrivalTime.getMonth(), 
+                    arrivalTime.getDate(),
+                    schedule.last.hour,
+                    schedule.last.minute
+                );
+                
+                // 检查理论出发时间是否在运营时间内
+                if (theoreticalDeparture < firstDeparture) {
+                    logDebug(`理论出发时间 ${formatTime(theoreticalDeparture)} 早于首班车 ${formatTime(firstDeparture)}，使用首班车时间`);
+                    return firstDeparture;
+                }
+                
+                if (theoreticalDeparture > lastDeparture) {
+                    logDebug(`理论出发时间 ${formatTime(theoreticalDeparture)} 晚于末班车 ${formatTime(lastDeparture)}，无可用车次`);
+                    return null;
+                }
+                
+                // 根据时间段确定发车间隔
+                const period = getTimePeriod(theoreticalDeparture, isWeekday);
+                const interval = getRegularInterval(period);
+                logDebug(`时间段: ${period === 'peak' ? '高峰期' : period === 'offpeak' ? '平峰期' : '非高峰期'}, 发车间隔: ${interval}分钟`);
+                
+                // 找到理论出发时间前最近的一班车
+                const hours = theoreticalDeparture.getHours();
+                let minutes = theoreticalDeparture.getMinutes();
+                
+                // 特殊处理首班车小时
+                if (hours === schedule.first.hour) {
+                    // 如果是首班车小时，确保不早于首班车时间
+                    if (minutes < schedule.first.minute) {
+                        return firstDeparture;
+                    }
+                }
+                
+                // 计算该小时内最接近的发车时间
+                const nearestMinute = Math.floor(minutes / interval) * interval;
+                
+                // 创建该发车时间的Date对象
+                let departureTime = new Date(
+                    theoreticalDeparture.getFullYear(),
+                    theoreticalDeparture.getMonth(),
+                    theoreticalDeparture.getDate(),
+                    hours,
+                    nearestMinute
+                );
+                
+                // 如果计算出的时间早于首班车，使用首班车时间
+                if (departureTime < firstDeparture) {
+                    departureTime = firstDeparture;
+                }
+                
+                logDebug(`从到达时间 ${formatTime(arrivalTime)} 反推出普通车出发时间: ${formatTime(departureTime)}`);
+                return departureTime;
+            } catch (error) {
+                logDebug(`反推普通车出发时间时出错: ${error.message}`);
+                return null;
+            }
+        }
+
+        // 计算行程函数
+        function calculateJourney() {
+            try {
+                logDebug('========== 计算出发时间按钮被点击，开始处理 ==========');
+                
+                // 隐藏之前的结果和错误
+                const resultDiv = document.getElementById('result');
+                if (resultDiv) resultDiv.classList.add('hidden');
+                
+                const errorEl = document.getElementById('error-message');
+                if (errorEl) errorEl.classList.add('hidden');
+                
+                // 获取表单数据
+                const startStation = document.getElementById('start-station')?.value;
+                const endStation = document.getElementById('end-station')?.value;
+                const arrivalDate = document.getElementById('arrival-date')?.value;
+                const arrivalTime = document.getElementById('arrival-time')?.value;
+                const preference = document.querySelector('input[name="preference"]:checked')?.value;
+                
+                logDebug(`表单数据: 起点=${startStation}(${stationNames[startStation]}), 终点=${endStation}(${stationNames[endStation]}), 日期=${arrivalDate}, 时间=${arrivalTime}, 偏好=${preference}`);
+                
+                // 验证关键元素
+                if (!startStation || !endStation) {
+                    logDebug('未找到起点站或终点站元素');
+                    showError('页面元素错误: 未找到起点站或终点站选择框');
+                    return;
+                }
+                
+                if (!arrivalDate) {
+                    logDebug('未选择到达日期');
+                    showError('请选择到达日期');
+                    return;
+                }
+                
+                if (!arrivalTime) {
+                    logDebug('未选择到达时间');
+                    showError('请选择到达时间');
+                    return;
+                }
+                
+                // 验证起点和终点是否相同
+                if (startStation === endStation) {
+                    logDebug('起点和终点相同');
+                    showError('起点和终点不能相同，请重新选择');
+                    return;
+                }
+                
+                // 创建到达时间的Date对象
+                const arrivalDateTime = new Date(`${arrivalDate}T${arrivalTime}`);
+                if (isNaN(arrivalDateTime.getTime())) {
+                    logDebug('无效的日期时间格式');
+                    showError('请输入有效的日期和时间');
+                    return;
+                }
+                logDebug(`到达时间: ${arrivalDateTime.toLocaleString()}`);
+                
+                const journeyDate = new Date(arrivalDate); // 行程日期
+                const isWeekday = isWeekdayDate(journeyDate);
+                
+                // 确定方向
+                const stationsOrder = ['longyanglu', 'huaxiazhenlu', 'luoshanlu', 'zhoupudong', 'heshahangcheng', 
+                                      'hangtoudong', 'xinchang', 'yeshengdongwuyuan', 'huinan', 'huinandong', 
+                                      'shuyuan', 'lingangdadao', 'dishuihu'];
+                const startIndex = stationsOrder.indexOf(startStation);
+                const endIndex = stationsOrder.indexOf(endStation);
+                
+                let direction;
+                if (startIndex < endIndex) {
+                    direction = 'longyanglu_to_dishuihu';
+                } else {
+                    direction = 'dishuihu_to_longyanglu';
+                }
+                logDebug(`行程方向: ${direction === 'longyanglu_to_dishuihu' ? '龙阳路→滴水湖' : '滴水湖→龙阳路'}`);
+                
+                // 获取所有可用车次（包括普通车、大站车和直达车）
+                const allTrains = generateAvailableTrains(journeyDate);
+                if (allTrains.length === 0) {
+                    logDebug('未生成任何可用车次');
+                    showError('无法生成可用车次，请检查日期是否有效');
+                    return;
+                }
+                
+                // 筛选符合起点、终点且能准时到达的车次
+                const validTrains = [];
+                
+                // 处理所有类型的车次
+                allTrains.forEach(train => {
+                    try {
+                        // 检查方向是否匹配
+                        if (train.direction !== direction) {
+                            return;
+                        }
+                        
+                        // 直达车只适用于龙阳路和滴水湖之间
+                        if (train.type === 'direct' && !(
+                            (startStation === 'longyanglu' && endStation === 'dishuihu') || 
+                            (startStation === 'dishuihu' && endStation === 'longyanglu')
+                        )) {
+                            return;
+                        }
+                        
+                        // 检查起点和终点是否在该车次的停靠站点中
+                        if (!isStationInTrainType(startStation, train.type, direction)) {
+                            return;
+                        }
+                        
+                        if (!isStationInTrainType(endStation, train.type, direction)) {
+                            return;
+                        }
+                        
+                        // 计算该车次从起点到终点的时间
+                        const stopTime = calculateStopTime(train.type, direction, startStation, endStation);
+                        if (stopTime === null || stopTime <= 0) {
+                            return;
+                        }
+                        
+                        // 计算该车次到达起点站的时间
+                        let startTime;
+                        if (train.departureStation === startStation) {
+                            // 如果起点是列车的始发站
+                            startTime = new Date(train.departureTime.getTime());
+                        } else {
+                            // 计算列车到达起点站的时间
+                            const departureTimes = train.type === 'regular' ? regularStopsTime : expressStopsTime;
+                            const startOffset = departureTimes[direction][startStation];
+                            startTime = new Date(train.departureTime.getTime() + startOffset * 60000);
+                        }
+                        
+                        // 计算到达终点站的时间
+                        const endTime = new Date(startTime.getTime() + stopTime * 60000);
+                        
+                        // 计算等车时间（当前时间到发车时间）
+                        const now = new Date();
+                        const currentDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                        const journeyDate = new Date(arrivalDateTime.getFullYear(), arrivalDateTime.getMonth(), arrivalDateTime.getDate());
+                        
+                        let waitTime;
+                        if (currentDate.getTime() === journeyDate.getTime()) {
+                            // 同一天
+                            waitTime = Math.round((startTime - now) / 60000); // 分钟
+                        } else if (currentDate < journeyDate) {
+                            // 未来几天
+                            waitTime = Math.round((startTime - now) / (60000 * 60)); // 小时
+                            waitTime = `约${waitTime}小时`;
+                        } else {
+                            // 过去的日期
+                            waitTime = 0;
+                        }
+                        
+                        // 添加到有效车次列表
+                        validTrains.push({
+                            ...train,
+                            startTime,
+                            endTime,
+                            stopTime,
+                            direction,
+                            isLate: endTime > arrivalDateTime,
+                            // 普通车等车时间 = 发车间隔
+                            waitTime: train.type === 'regular' ? train.interval : 
+                                      (typeof waitTime === 'number' ? waitTime : 0)
+                        });
+                    } catch (error) {
+                        logDebug(`处理车次时出错: ${error.message}`);
+                    }
+                });
+                
+                // 为普通车添加从到达时间反推的出发时间
+                // 计算理论上的普通车出发时间
+                const regularDeparture = calculateRegularDepartureFromArrival(
+                    arrivalDateTime, 
+                    direction, 
+                    startStation, 
+                    endStation, 
+                    isWeekday
+                );
+                
+                if (regularDeparture) {
+                    // 计算该普通车到达终点站的时间
+                    const journeyTime = calculateStopTime('regular', direction, startStation, endStation);
+                    const regularEndTime = new Date(regularDeparture.getTime() + journeyTime * 60000);
+                    
+                    // 获取该时间段的发车间隔
+                    const period = getTimePeriod(regularDeparture, isWeekday);
+                    const interval = getRegularInterval(period);
+                    
+                    // 创建反推的普通车车次信息
+                    const reversedRegularTrain = {
+                        type: 'regular',
+                        name: '普通车',
+                        direction: direction,
+                        departureStation: startStation,
+                        departureTime: regularDeparture,
+                        duration: journeyTime,
+                        arrivalStation: endStation,
+                        interval: interval,
+                        startTime: regularDeparture,
+                        endTime: regularEndTime,
+                        stopTime: journeyTime,
+                        isLate: regularEndTime > arrivalDateTime,
+                        waitTime: interval,
+                        isReversed: true // 标记为反推的车次
+                    };
+                    
+                    // 将反推的普通车添加到有效车次列表
+                    validTrains.push(reversedRegularTrain);
+                    logDebug(`添加反推的普通车: ${formatTime(regularDeparture)} 从 ${stationNames[startStation]} 出发`);
+                } else {
+                    logDebug('无法计算反推的普通车出发时间');
+                }
+                
+                // 检查是否有可用的不迟到车次
+                const onTimeTrains = validTrains.filter(train => !train.isLate);
+                
+                // 如果有不迟到的车次，优先使用这些
+                let filteredTrains = onTimeTrains.length > 0 ? onTimeTrains : validTrains;
+                
+                if (filteredTrains.length === 0) {
+                    logDebug('没有找到有效的车次');
+                    showError(`没有找到符合条件的车次，请尝试调整到达时间。`);
+                    return;
+                }
+                
+                logDebug(`筛选后剩余 ${filteredTrains.length} 个有效车次`);
+                
+                // 根据偏好排序
+                let sortedTrains = [...filteredTrains];
+                
+                if (preference === 'fast') {
+                    // 优先最快到达：在满足目标到达时间的情况下，出发时间尽可能晚
+                    // 当普通车与大站车的出发时间间隔在10分钟以内时，优先选择大站车；否则选择普通车
+                    sortedTrains.sort((a, b) => {
+                        // 首先考虑是否迟到
+                        if (a.isLate && !b.isLate) return 1;
+                        if (!a.isLate && b.isLate) return -1;
+                        
+                        // 对于不迟到的车次，考虑类型和出发时间间隔
+                        if (!a.isLate && !b.isLate) {
+                            // 计算两车的出发时间差（分钟）
+                            const timeDiffMinutes = Math.abs(a.startTime - b.startTime) / (1000 * 60);
+                            
+                            // 如果出发时间间隔在10分钟以内，优先选择大站车
+                            if (timeDiffMinutes <= 10) {
+                                if (a.type === 'express' && b.type !== 'express') return -1;
+                                if (a.type !== 'express' && b.type === 'express') return 1;
+                            }
+                            
+                            // 其他情况下，优先选择出发时间较晚的车次
+                            return b.startTime - a.startTime;
+                        }
+                        
+                        // 如果都迟到或需要进一步排序，考虑到达时间与目标时间的接近度
+                        const aDiff = Math.abs(a.endTime - arrivalDateTime);
+                        const bDiff = Math.abs(b.endTime - arrivalDateTime);
+                        return aDiff - bDiff;
+                    });
+                    logDebug('按最快到达排序：在满足目标到达时间的情况下，优先选择出发时间较晚的车次；当普通车与大站车的出发时间间隔在10分钟以内时，优先选择大站车');
+                } else if (preference === 'direct') {
+                    // 优先直达车，但只在它们不迟到的情况下
+                    sortedTrains.sort((a, b) => {
+                        if (a.isLate && !b.isLate) return 1;
+                        if (!a.isLate && b.isLate) return -1;
+                        
+                        // 只在直达车不迟到的情况下才优先
+                        if (a.type === 'direct' && !a.isLate && b.type !== 'direct') return -1;
+                        if (a.type !== 'direct' && b.type === 'direct' && !b.isLate) return 1;
+                        
+                        // 当车次类型相同时，优先考虑到达时间接近用户目标时间的车次
+                        const aDiff = Math.abs(a.endTime - arrivalDateTime);
+                        const bDiff = Math.abs(b.endTime - arrivalDateTime);
+                        return aDiff - bDiff;
+                    });
+                    logDebug('按优先直达车排序，并考虑到达时间与目标时间的接近度');
+                } else if (preference === 'express') {
+                    // 优先大站车
+                    sortedTrains.sort((a, b) => {
+                        if (a.isLate && !b.isLate) return 1;
+                        if (!a.isLate && b.isLate) return -1;
+                        
+                        if (a.type === 'express' && b.type !== 'express') return -1;
+                        if (a.type !== 'express' && b.type === 'express') return 1;
+                        
+                        // 当车次类型相同时，优先考虑到达时间接近用户目标时间的车次
+                        const aDiff = Math.abs(a.endTime - arrivalDateTime);
+                        const bDiff = Math.abs(b.endTime - arrivalDateTime);
+                        return aDiff - bDiff;
+                    });
+                    logDebug('按优先大站车排序，并考虑到达时间与目标时间的接近度');
+                } else if (preference === 'local') {
+                    // 优先普通车
+                    sortedTrains.sort((a, b) => {
+                        if (a.isLate && !b.isLate) return 1;
+                        if (!a.isLate && b.isLate) return -1;
+                        
+                        if (a.type === 'regular' && b.type !== 'regular') return -1;
+                        if (a.type !== 'regular' && b.type === 'regular') return 1;
+                        
+                        // 当车次类型相同时，优先考虑到达时间接近用户目标时间的车次
+                        const aDiff = Math.abs(a.endTime - arrivalDateTime);
+                        const bDiff = Math.abs(b.endTime - arrivalDateTime);
+                        return aDiff - bDiff;
+                    });
+                    logDebug('按优先普通车排序，并考虑到达时间与目标时间的接近度');
+                }
+                
+                // 选择最佳车次
+                const bestTrain = sortedTrains[0];
+                logDebug(`最佳车次: ${bestTrain.type} ${bestTrain.startTime.toLocaleTimeString()} 发车`);
+                
+                // 获取停靠站点信息
+                const stopsText = generateStopsText(bestTrain.type, bestTrain.direction, bestTrain.departureTime);
+                
+                // 显示结果
+                document.getElementById('result-start').textContent = stationNames[startStation];
+                document.getElementById('result-end').textContent = stationNames[endStation];
+                document.getElementById('result-arrival').textContent = formatDateTime(arrivalDateTime);
+                document.getElementById('result-departure').textContent = formatTime(bestTrain.startTime);
+                document.getElementById('result-duration').textContent = `${bestTrain.stopTime} 分钟`;
+                document.getElementById('result-estimated').textContent = formatTime(bestTrain.endTime);
+                document.getElementById('result-train-type').textContent = bestTrain.name;
+                document.getElementById('result-stops').textContent = stopsText;
+                document.getElementById('result-date-type').textContent = isWeekday ? '工作日班次' : '节假日班次';
+
+                // 根据偏好设置决定显示内容
+                const otherTrainsElement = document.getElementById('other-trains-info');
+                const otherTrainsContainer = otherTrainsElement.closest('.bg-purple-50');
+                
+                if (preference === 'fast') {
+                    // 优先最快到达时，显示10分钟误差范围内的其他车型信息表格
+                    const alternativeTrainsHtml = getAlternativeTrainsTable(sortedTrains, bestTrain, startStation, endStation, stationNames);
+                    if (alternativeTrainsHtml) {
+                        otherTrainsElement.innerHTML = alternativeTrainsHtml;
+                        otherTrainsContainer.classList.remove('hidden');
+                    } else {
+                        otherTrainsContainer.classList.add('hidden');
+                    }
+                } else {
+                    // 其他偏好设置时，显示原有的大站车/直达车信息
+                    const nextExpressInfo = getNextExpressOrDirectTime(allTrains, new Date(), bestTrain.direction);
+                    otherTrainsElement.textContent = nextExpressInfo;
+                    otherTrainsContainer.classList.remove('hidden');
+                }
+                
+                // 生成建议文本
+                let adviceText = `建议您乘坐${bestTrain.name}，于${formatTime(bestTrain.startTime)}从${stationNames[startStation]}出发，`;
+                adviceText += `行程约${bestTrain.stopTime}分钟，预计${formatTime(bestTrain.endTime)}到达${stationNames[endStation]}。`;
+                
+                // 添加等车时间信息
+                if (bestTrain.type === 'regular') {
+                    adviceText += ` 预计等车时间约${bestTrain.waitTime}分钟。`;
+                } else if (typeof bestTrain.waitTime === 'number' && bestTrain.waitTime > 0) {
+                    adviceText += ` 您需要等待${bestTrain.waitTime}分钟。`;
+                }
+                
+                // 根据列车类型添加额外建议
+                if (bestTrain.type === 'regular') {
+                    const period = getTimePeriod(bestTrain.startTime, isWeekday);
+                    const periodText = period === 'peak' ? '高峰期' : period === 'offpeak' ? '平峰期' : '非高峰期';
+                    adviceText += ` 目前为${periodText}，普通车发车间隔为${bestTrain.interval}分钟。`;
+                } else if (bestTrain.type === 'express') {
+                    adviceText += ' 大站车仅停靠主要站点，速度较快，适合中长途出行。';
+                } else if (bestTrain.type === 'direct') {
+                    adviceText += ' 此为直达车，中途不停靠任何站点，速度最快。';
+                }
+                
+                // 如果是迟到的车次，添加提示
+                if (bestTrain.isLate) {
+                    adviceText += ' 此车次将晚于您设定的到达时间，请知悉。';
+                } else {
+                    adviceText += ' 可确保您准时参加活动。';
+                }
+                
+                document.getElementById('result-advice').textContent = adviceText;
+                
+                // 显示结果区域并添加动画
+                if (resultDiv) {
+                    resultDiv.classList.remove('hidden');
+                    resultDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    
+                    // 添加淡入动画
+                    resultDiv.style.opacity = '0';
+                    resultDiv.style.transform = 'translateY(20px)';
+                    resultDiv.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                    
+                    setTimeout(() => {
+                        resultDiv.style.opacity = '1';
+                        resultDiv.style.transform = 'translateY(0)';
+                    }, 10);
+                }
+                
+                logDebug('行程计算完成，结果已显示');
+            } catch (error) {
+                logDebug(`计算行程时出错: ${error.message}`);
+                showError(`计算行程失败: ${error.message}`);
+                console.error('计算行程错误:', error);
+            }
+        }
+
+        // 初始化函数
+        function init() {
+            try {
+                logDebug('页面开始初始化...');
+                
+                // 设置默认日期和时间
+                const today = new Date();
+                const dateInput = document.getElementById('arrival-date');
+                const timeInput = document.getElementById('arrival-time');
+                
+                if (dateInput) {
+                    const year = today.getFullYear();
+                    const month = String(today.getMonth() + 1).padStart(2, '0');
+                    const day = String(today.getDate()).padStart(2, '0');
+                    dateInput.value = `${year}-${month}-${day}`;
+                    logDebug(`默认日期设置为: ${dateInput.value}`);
+                }
+                
+                if (timeInput) {
+                    const nextHour = new Date(today.getTime() + 60 * 60000);
+                    const hours = String(nextHour.getHours()).padStart(2, '0');
+                    const minutes = String(nextHour.getMinutes()).padStart(2, '0');
+                    timeInput.value = `${hours}:${minutes}`;
+                    logDebug(`默认时间设置为: ${timeInput.value}`);
+                }
+                
+                // 移动端菜单切换
+                const menuToggle = document.getElementById('menu-toggle');
+                const mobileMenu = document.getElementById('mobile-menu');
+                
+                if (menuToggle && mobileMenu) {
+                    menuToggle.addEventListener('click', function() {
+                        mobileMenu.classList.toggle('hidden');
+                        const icon = menuToggle.querySelector('i');
+                        if (icon) {
+                            if (icon.classList.contains('fa-bars')) {
+                                icon.classList.remove('fa-bars');
+                                icon.classList.add('fa-times');
+                            } else {
+                                icon.classList.remove('fa-times');
+                                icon.classList.add('fa-bars');
+                            }
+                        }
+                    });
+                }
+                
+                // 导航栏滚动效果
+                const navbar = document.getElementById('navbar');
+                if (navbar) {
+                    window.addEventListener('scroll', function() {
+                        if (window.scrollY > 50) {
+                            navbar.classList.add('py-2');
+                            navbar.classList.remove('py-4');
+                            navbar.classList.add('shadow-lg');
+                        } else {
+                            navbar.classList.add('py-4');
+                            navbar.classList.remove('py-2');
+                            navbar.classList.remove('shadow-lg');
+                        }
+                    });
+                }
+                
+                // 调试信息切换
+                const toggleDebugBtn = document.getElementById('toggle-debug');
+                const debugEl = document.getElementById('debug-info');
+                
+                if (toggleDebugBtn && debugEl) {
+                    toggleDebugBtn.addEventListener('click', function() {
+                        if (debugEl.style.display === 'none' || debugEl.style.display === '') {
+                            debugEl.style.display = 'block';
+                            logDebug('调试信息已显示');
+                        } else {
+                            debugEl.style.display = 'none';
+                            logDebug('调试信息已隐藏');
+                        }
+                    });
+                }
+                
+                // 绑定计算按钮事件
+                const calculateButton = document.getElementById('calculate-button');
+                if (calculateButton) {
+                    calculateButton.addEventListener('click', calculateJourney);
+                    logDebug('计算按钮事件绑定成功');
+                } else {
+                    logDebug('未找到计算按钮元素！');
+                    showError('严重错误: 未找到计算按钮，请刷新页面重试');
+                }
+                
+
+                
+                logDebug('初始化完成');
+            } catch (error) {
+                console.error('初始化时出错:', error);
+                logDebug(`初始化失败: ${error.message}`);
+                alert(`页面加载出错: ${error.message}\n请刷新页面重试`);
+            }
+        }
+
+        // 确保初始化函数执行
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+    
+
+</body>
+</html>
